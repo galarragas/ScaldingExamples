@@ -12,7 +12,7 @@ import com.twitter.scalding.Osv
 import com.twitter.scalding.Tsv
 import com.twitter.scalding.RichPipe
 
-package object schemas {
+package object sampleJobSchemas {
   val INPUT_SCHEMA = List('date, 'userid, 'url)
   val WITH_DAY_SCHEMA = List('date, 'userid, 'url, 'day)
   val EVENT_COUNT_SCHEMA = List('day, 'userid, 'event_count)
@@ -27,7 +27,7 @@ object BasicConversions {
 }
 
 object SampleJobPipeTransformations extends FieldConversions with TupleConversions {
-  import schemas._
+  import sampleJobSchemas._
   import BasicConversions._
 
   val INPUT_DATE_PATTERN: String = "dd/MM/yyyy HH:mm:ss"
@@ -68,14 +68,45 @@ object SampleJobPipeTransformationWrappers {
   }
 }
 
-import SampleJobPipeTransformationWrappers._
-import schemas._
-
 class SampleJob(args: Args) extends Job(args) {
+  import SampleJobPipeTransformationWrappers._
+  import sampleJobSchemas._
 
   Osv(args("eventsPath"), INPUT_SCHEMA).read
     .addDayColumn
     .countUserEventsPerDay
     .addUserInfo(Osv(args("userInfoPath"), USER_DATA_SCHEMA).read)
     .write( Tsv(args("outputPath"), OUTPUT_SCHEMA) )
+}
+
+package object otherJobSchemas {
+  val DAILY_EVENT_COUNT_SCHEMA = List('day, 'event_count)
+}
+
+object OtherJobPipeTransformationWrappers extends FieldConversions with TupleConversions {
+  import BasicConversions._
+
+  implicit def wrapPipe(self: Pipe): OtherJobPipeTransformationsWrapper =
+    new OtherJobPipeTransformationsWrapper(new RichPipe(self))
+
+  implicit class OtherJobPipeTransformationsWrapper(val self: RichPipe) {
+    def addDayColumn : Pipe = SampleJobPipeTransformations.addDayColumn(self)
+
+    /** Input schema: WITH_DAY_SCHEMA
+      * Output schema: DAILY_EVENT_COUNT_SCHEMA */
+    def countEventsPerDay : Pipe =
+      self.groupBy('day) { _.size('event_count) }
+  }
+}
+
+
+class OtherJob(args: Args) extends Job(args) {
+  import OtherJobPipeTransformationWrappers._
+  import sampleJobSchemas._
+  import otherJobSchemas._
+
+  Osv(args("eventsPath"), INPUT_SCHEMA).read
+    .addDayColumn
+    .countEventsPerDay
+    .write( Tsv(args("outputPath"), DAILY_EVENT_COUNT_SCHEMA) )
 }
