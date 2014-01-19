@@ -6,7 +6,7 @@ import org.joda.time.format.DateTimeFormat
 import SampleJobPipeTransformations.SampleJobPipeTransformationsWrapper
 import com.twitter.scalding.Osv
 
-package object schemas {
+package object sampleJobSchema {
   val INPUT_SCHEMA = List('date, 'userid, 'url)
   val WITH_DAY_SCHEMA = List('date, 'userid, 'url, 'day)
   val EVENT_COUNT_SCHEMA = List('day, 'userid, 'event_count)
@@ -21,7 +21,7 @@ object BasicConversions {
 }
 
 object SampleJobPipeTransformations extends FieldConversions with TupleConversions  {
-  import schemas._
+  import sampleJobSchema._
   import BasicConversions._
 
   implicit def wrapPipe(self: Pipe): SampleJobPipeTransformationsWrapper =
@@ -52,10 +52,9 @@ object SampleJobPipeTransformations extends FieldConversions with TupleConversio
   }
 }
 
-import SampleJobPipeTransformations._
-import schemas._
-
 class SampleJob(args: Args) extends Job(args) {
+  import SampleJobPipeTransformations._
+  import sampleJobSchema._
 
   Osv(args("eventsPath"), INPUT_SCHEMA).read
     .addDayColumn
