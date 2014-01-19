@@ -28,6 +28,8 @@ class ExternalServiceImpl extends ExternalService {
 trait DependencyInjectedTransformations extends FieldConversions with TupleConversions {
   import BasicConversions._
 
+  def self: Pipe
+
   def externalService : ExternalService
 
   /** Joins with userData to add email and address
@@ -35,13 +37,11 @@ trait DependencyInjectedTransformations extends FieldConversions with TupleConve
     * Input schema: INPUT_SCHEMA
     * User data schema: USER_DATA_SCHEMA
     * Output schema: OUTPUT_SCHEMA */
-  def addUserInfo(userData: Pipe) : Pipe = userData.map('userid -> ('email, 'address) ) { userId : String => externalService.getUserInfo(userId) }
+  def addUserInfo : Pipe = self.map('userid -> ('email, 'address) ) { userId : String => externalService.getUserInfo(userId) }
 }
 
 object ConstructorInjectedTransformationsWrappers {
-  implicit class ConstructorInjectedTransformationsWrapper(self: Pipe)(implicit val externalService : ExternalService) extends DependencyInjectedTransformations {
-    def addUserInfo : Pipe = addUserInfo(self)
-  }
+  implicit class ConstructorInjectedTransformationsWrapper(val self: Pipe)(implicit val externalService : ExternalService) extends DependencyInjectedTransformations
   implicit def fromRichPipe(richPipe: RichPipe)(implicit externalService : ExternalService) = new ConstructorInjectedTransformationsWrapper(richPipe.pipe)
 }
 
@@ -57,10 +57,8 @@ class ConstructorInjectingSampleJob(args: Args) extends Job(args) {
 }
 
 object FrameworkInjectedTransformationsWrappers {
-  implicit class FrameworkInjectedTransformationsWrapper(self: Pipe)(implicit val bindingModule : BindingModule) extends DependencyInjectedTransformations with Injectable {
+  implicit class FrameworkInjectedTransformationsWrapper(val self: Pipe)(implicit val bindingModule : BindingModule) extends DependencyInjectedTransformations with Injectable {
     val externalService = inject[ExternalService]
-
-    def addUserInfo : Pipe = addUserInfo(self)
   }
   implicit def fromRichPipe(richPipe: RichPipe)(implicit bindingModule : BindingModule) = new FrameworkInjectedTransformationsWrapper(richPipe.pipe)
 }
