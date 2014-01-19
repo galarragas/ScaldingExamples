@@ -22,7 +22,7 @@ trait ExternalService {
 }
 
 class ExternalServiceImpl extends ExternalService {
-  def getUserInfo(userId: String): UserInfo = new UserInfo("email", "address")
+  def getUserInfo(userId: String): UserInfo = ??? //Calls an external web service
 }
 
 trait DependencyInjectedTransformations extends FieldConversions with TupleConversions {
