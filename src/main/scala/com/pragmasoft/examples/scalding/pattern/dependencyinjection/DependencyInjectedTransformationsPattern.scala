@@ -58,7 +58,7 @@ class ConstructorInjectingSampleJob(args: Args) extends Job(args) {
 
 object FrameworkInjectedTransformationsWrappers {
   implicit class FrameworkInjectedTransformationsWrapper(val self: Pipe)(implicit val bindingModule : BindingModule) extends DependencyInjectedTransformations with Injectable {
-    val externalService = inject[ExternalService]
+    lazy val externalService = inject[ExternalService]
   }
   implicit def fromRichPipe(richPipe: RichPipe)(implicit bindingModule : BindingModule) = new FrameworkInjectedTransformationsWrapper(richPipe.pipe)
 }
