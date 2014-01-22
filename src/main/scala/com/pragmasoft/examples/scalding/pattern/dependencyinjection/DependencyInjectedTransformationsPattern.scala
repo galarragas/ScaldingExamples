@@ -3,7 +3,7 @@ package com.pragmasoft.examples.scalding.pattern.dependencyinjection
 import cascading.pipe.Pipe
 import com.twitter.scalding._
 import com.twitter.scalding.Osv
-import com.escalatesoft.subcut.inject.{BindingModule, Injectable}
+import com.escalatesoft.subcut.inject.{MutableBindingModule, BindingModule, Injectable}
 
 object dependencyInjectedTransformationsSchema {
   val INPUT_SCHEMA = List('date, 'userid, 'url)
@@ -63,12 +63,25 @@ object FrameworkInjectedTransformationsWrappers {
   implicit def fromRichPipe(richPipe: RichPipe)(implicit bindingModule : BindingModule) = new FrameworkInjectedTransformationsWrapper(richPipe.pipe)
 }
 
+// Need a NewBindingModule extending Serializable to allow the class to be trasferred during MR execution
+class NewSerializableBindingModule(fn: MutableBindingModule => Unit) extends BindingModule with Serializable {
+  lazy val bindings = {
+    val module = new Object with MutableBindingModule
+    fn(module)
+    module.freeze().fixed.bindings
+  }
+}
+
+object NewSerializableBindingModule {
+  def newSerializableBindingModule(function: (MutableBindingModule) => Unit) = new NewSerializableBindingModule(function)
+}
+
 class FrameworkInjectingSampleJob(args: Args) extends Job(args) {
   import FrameworkInjectedTransformationsWrappers._
   import dependencyInjectedTransformationsSchema._
-  import com.escalatesoft.subcut.inject.NewBindingModule._
+  import NewSerializableBindingModule._
 
-  implicit val bindingModule = newBindingModule { bindingModule =>
+  implicit val bindingModule = newSerializableBindingModule { bindingModule =>
     import bindingModule._
 
     bind [ExternalService] toSingle new ExternalServiceImpl()
