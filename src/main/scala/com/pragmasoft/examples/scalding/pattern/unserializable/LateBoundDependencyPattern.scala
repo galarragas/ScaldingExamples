@@ -48,16 +48,16 @@ trait DependencyInjectedTransformations extends FieldConversions with TupleConve
   def addUserInfo : Pipe = self.map('userid -> ('email, 'address) ) { userId : String => externalService.getUserInfo(userId) }
 }
 
-object ConstructorInjectedTransformationsWrappers {
+object ConstructorLazilyInjectedTransformationsWrappers {
   type ExternalServiceFactory = () => ExternalService
-  implicit class ConstructorInjectedTransformationsWrapper(val self: Pipe)(implicit externalServiceFactory : ExternalServiceFactory) extends DependencyInjectedTransformations {
+  implicit class ConstructorLazilyInjectedTransformationsWrapper(val self: Pipe)(implicit externalServiceFactory : ExternalServiceFactory) extends DependencyInjectedTransformations {
     lazy val externalService : ExternalService = externalServiceFactory()
   }
-  implicit def fromRichPipe(richPipe: RichPipe)(implicit externalServiceFactory : ExternalServiceFactory) = new ConstructorInjectedTransformationsWrapper(richPipe.pipe)
+  implicit def fromRichPipe(richPipe: RichPipe)(implicit externalServiceFactory : ExternalServiceFactory) = new ConstructorLazilyInjectedTransformationsWrapper(richPipe.pipe)
 }
 
 class ConstructorInjectingSampleJob(args: Args) extends Job(args) {
-  import ConstructorInjectedTransformationsWrappers._
+  import ConstructorLazilyInjectedTransformationsWrappers._
   import dependencyInjectedTransformationsSchema._
 
   implicit val externalServiceFactory : ExternalServiceFactory = () => new ExternalServiceImpl()
@@ -67,7 +67,7 @@ class ConstructorInjectingSampleJob(args: Args) extends Job(args) {
     .write( Tsv(args("outputPath"), OUTPUT_SCHEMA) )
 }
 
-object FrameworkInjectedTransformationsWrappers {
+object FrameworkLazilyInjectedTransformationsWrappers {
   implicit class FrameworkInjectedTransformationsWrapper(val self: Pipe)(implicit val bindingModule : BindingModule) extends DependencyInjectedTransformations with Injectable {
     val externalService = inject[ExternalService]
   }
@@ -75,7 +75,7 @@ object FrameworkInjectedTransformationsWrappers {
 }
 
 class FrameworkInjectingSampleJob(args: Args) extends Job(args) {
-  import FrameworkInjectedTransformationsWrappers._
+  import FrameworkLazilyInjectedTransformationsWrappers._
   import dependencyInjectedTransformationsSchema._
   import com.escalatesoft.subcut.inject.NewBindingModule._
 
