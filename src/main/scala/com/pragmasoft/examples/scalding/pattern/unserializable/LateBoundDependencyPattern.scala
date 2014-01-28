@@ -1,9 +1,17 @@
-package com.pragmasoft.examples.scalding.pattern.dependencyinjection
+package com.pragmasoft.examples.scalding.pattern.unserializable
 
 import cascading.pipe.Pipe
+import com.escalatesoft.subcut.inject.NewBindingModule._
 import com.twitter.scalding._
+import com.twitter.scalding.Args
+import com.twitter.scalding.FieldConversions
+import com.twitter.scalding.Job
 import com.twitter.scalding.Osv
 import com.escalatesoft.subcut.inject.{MutableBindingModule, BindingModule, Injectable}
+import com.twitter.scalding.Osv
+import com.twitter.scalding.RichPipe
+import com.twitter.scalding.Tsv
+import com.twitter.scalding.TupleConversions
 
 object dependencyInjectedTransformationsSchema {
   val INPUT_SCHEMA = List('date, 'userid, 'url)
@@ -40,25 +48,28 @@ trait DependencyInjectedTransformations extends FieldConversions with TupleConve
   def addUserInfo : Pipe = self.map('userid -> ('email, 'address) ) { userId : String => externalService.getUserInfo(userId) }
 }
 
-object ConstructorInjectedTransformationsWrappers {
-  implicit class ConstructorInjectedTransformationsWrapper(val self: Pipe)(implicit val externalService : ExternalService) extends DependencyInjectedTransformations
-  implicit def fromRichPipe(richPipe: RichPipe)(implicit externalService : ExternalService) = new ConstructorInjectedTransformationsWrapper(richPipe.pipe)
+object ConstructorLazilyInjectedTransformationsWrappers {
+  type ExternalServiceFactory = () => ExternalService
+  implicit class ConstructorLazilyInjectedTransformationsWrapper(val self: Pipe)(implicit externalServiceFactory : ExternalServiceFactory) extends DependencyInjectedTransformations {
+    lazy val externalService : ExternalService = externalServiceFactory()
+  }
+  implicit def fromRichPipe(richPipe: RichPipe)(implicit externalServiceFactory : ExternalServiceFactory) = new ConstructorLazilyInjectedTransformationsWrapper(richPipe.pipe)
 }
 
 class ConstructorInjectingSampleJob(args: Args) extends Job(args) {
-  import ConstructorInjectedTransformationsWrappers._
+  import ConstructorLazilyInjectedTransformationsWrappers._
   import dependencyInjectedTransformationsSchema._
 
-  implicit val externalServiceImpl = new ExternalServiceImpl()
+  implicit val externalServiceFactory : ExternalServiceFactory = () => new ExternalServiceImpl()
 
   Osv(args("eventsPath"), INPUT_SCHEMA).read
     .addUserInfo
     .write( Tsv(args("outputPath"), OUTPUT_SCHEMA) )
 }
 
-object FrameworkInjectedTransformationsWrappers {
+object FrameworkLazilyInjectedTransformationsWrappers {
   implicit class FrameworkInjectedTransformationsWrapper(val self: Pipe)(implicit val bindingModule : BindingModule) extends DependencyInjectedTransformations with Injectable {
-    lazy val externalService = inject[ExternalService]
+    val externalService = inject[ExternalService]
   }
   implicit def fromRichPipe(richPipe: RichPipe)(implicit bindingModule : BindingModule) = new FrameworkInjectedTransformationsWrapper(richPipe.pipe)
 }
@@ -77,17 +88,19 @@ object NewSerializableBindingModule {
 }
 
 class FrameworkInjectingSampleJob(args: Args) extends Job(args) {
-  import FrameworkInjectedTransformationsWrappers._
+  import FrameworkLazilyInjectedTransformationsWrappers._
   import dependencyInjectedTransformationsSchema._
   import NewSerializableBindingModule._
 
   implicit val bindingModule = newSerializableBindingModule { bindingModule =>
     import bindingModule._
 
-    bind [ExternalService] toSingle new ExternalServiceImpl()
+    bind [ExternalService] toSingle externalServiceFactory
   }
 
   Osv(args("eventsPath"), INPUT_SCHEMA).read
     .addUserInfo
     .write( Tsv(args("outputPath"), OUTPUT_SCHEMA) )
+
+  def externalServiceFactory() = new ExternalServiceImpl()
 }
